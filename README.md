@@ -38,7 +38,7 @@ DESIGN-meta.md remains the palette reference; typography and density follow the 
 
 Expenses require Card, GPay, or Cash in addition to Want/Need. Existing records have an unspecified payment source until edited. CSV exports include the source.
 
-The Wallet tab stores opening Cash and GPay balances and the opening outstanding Card bill, each with a starting date. Enter the balance before any recorded expenses on that date. Expenses on or after that date reduce Cash/GPay funds or increase the Card bill; editing and deleting an expense recomputes those amounts. Future-dated expenses do not change today's wallet balance. To reflect deposits, card repayments, or a balance correction, set a new opening balance and date. Card debt is displayed separately from total available funds.
+The Wallet tab stores opening Cash and GPay balances and the opening outstanding Card bill, each with a starting date. Enter the balance before any recorded expenses on that date. Expenses on or after that date reduce Cash/GPay funds or increase the Card bill; editing and deleting an expense recomputes those amounts. Future-dated expenses do not change today's wallet balance. To reflect deposits, card repayments, or a balance correction, set a new opening balance and date. Total funds includes Cash and GPay only. Kite allocations and Card debt are displayed separately.
 
 Kite funds are the sum of its allocations. Add named divisions through Manage. The default Credit Card division has a current-month and previous-month reserve; older saved months are retained and shown when the month changes. The two recent reserves are compared against the outstanding Card bill. A shortfall is red. This is a reserve comparison, not an automatic card payment.
 
@@ -57,3 +57,9 @@ The existing Pocket wallet logo is available on white and black backgrounds unde
 The service worker precaches only the built app shell and static assets, not Supabase responses or user data. Local-mode records remain available in browser storage offline; Supabase operations require connectivity. New app versions activate after the old app's tabs/windows close. Serve `/sw.js` with revalidation (`Cache-Control: no-cache`) on the production host.
 
 Install troubleshooting: restart `npm run dev` after changing the Vite configuration. Secure development previews now serve a non-caching worker at `/sw.js`; production builds still use the generated offline worker. The install event is captured before React mounts. Open the app directly in a normal browser tab. HTTP LAN addresses such as `http://192.168.x.x:5173` are not secure origins for a phone; use an HTTPS deployment. Browser installation behavior and secure-origin requirements: https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable.
+
+## Incoming and tools
+
+Use Incoming to record money received into Cash or GPay, or a Card refund/payment. Incoming entries share the transaction ledger, support editing/deletion and exports, appear in monthly and weekly reports, and increase funds or reduce card debt from the account's starting date. Spending totals and graphs exclude incoming. Want/Need remains mandatory for expenses; incoming has no spending classification. Funds still exclude Kite.
+
+The Tools tab has a calculator (arithmetic, brackets, percentages) and a notepad. Notes save per username using Save note, to Supabase when configured or browser storage otherwise. Run the latest `supabase/schema.sql` to add `transaction_type`, update the expense classification constraint, and create `notepads`.

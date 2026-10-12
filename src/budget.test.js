@@ -15,3 +15,10 @@ test('expenses require Want/Need and positive amounts',()=>{
  for(const payment_source of ['',null,'bank'])assert.throws(()=>validateExpense({...item,payment_source}));
  for(const amount of [0,-5,'abc',Infinity])assert.throws(()=>validateExpense({...item,amount}));
 });
+test('incoming requires an account and a positive amount without Want/Need',()=>{
+ const income={title:'Salary',amount:15000,date:'2026-10-12',transaction_type:'income',kind:null,payment_source:'gpay'};
+ assert.doesNotThrow(()=>validateExpense(income));
+ assert.throws(()=>validateExpense({...income,payment_source:''}));
+ assert.throws(()=>validateExpense({...income,amount:-1}));
+ assert.throws(()=>validateExpense({...income,transaction_type:'transfer'}));
+});

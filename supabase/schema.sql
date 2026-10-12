@@ -44,3 +44,21 @@ alter table public.wallets enable row level security;
 drop policy if exists username_wallets on public.wallets;
 create policy username_wallets on public.wallets for all to anon using (true) with check (true);
 grant select, insert, update on public.wallets to anon;
+
+-- Incoming transactions share the ledger; existing rows remain expenses.
+alter table public.expenses add column if not exists transaction_type text not null default 'expense'
+ check (transaction_type in ('expense','income'));
+alter table public.expenses alter column kind drop not null;
+alter table public.expenses drop constraint if exists expenses_classification_check;
+alter table public.expenses add constraint expenses_classification_check
+ check ((transaction_type = 'expense' and kind is not null and kind in ('want','need'))
+ or (transaction_type = 'income' and kind is null));
+create table if not exists public.notepads (
+ user_id uuid primary key references public.users(id) on delete cascade,
+ content text not null default '' check (length(content) <= 20000),
+ updated_at timestamptz not null default now()
+);
+alter table public.notepads enable row level security;
+drop policy if exists username_notepads on public.notepads;
+create policy username_notepads on public.notepads for all to anon using (true) with check (true);
+grant select, insert, update on public.notepads to anon;

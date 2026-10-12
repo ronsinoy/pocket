@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {defaultWallet,monthPair,walletBalance,kiteTotal,creditComparison,spendingSeries,validateWallet} from './wallet.js';
+import {defaultWallet,monthPair,walletBalance,kiteTotal,totalFunds,creditComparison,spendingSeries,validateWallet} from './wallet.js';
 const wallet=()=>({...defaultWallet(),cash:{amount:1000,as_of:'2026-10-01'},gpay:{amount:2000,as_of:'2026-10-01'},card:{amount:500,as_of:'2026-10-01'},kite:{divisions:[{id:'1',name:'Savings',amount:300}],credit_card:{'2026-10':400,'2026-09':200}}});
 const expenses=[{amount:100,date:'2026-10-02',payment_source:'cash'},{amount:250,date:'2026-10-03',payment_source:'gpay'},{amount:200,date:'2026-10-04',payment_source:'card'},{amount:500,date:'2026-09-01',payment_source:'cash'}];
 test('balances deduct cash/GPay spending, add card liability, exclude old spending',()=>{
@@ -15,6 +15,22 @@ test('Kite includes all allocations and card comparison detects a shortfall',()=
  assert.deepEqual(creditComparison(wallet(),expenses,new Date(2026,9,12)),{reserved:600,actual:700,difference:-100});
  const covered=wallet();covered.kite.credit_card['2026-10']=600;
  assert.equal(creditComparison(covered,expenses,new Date(2026,9,12)).difference,100);
+});
+test('total funds includes Cash and GPay and excludes Kite and card debt',()=>{
+ const w=wallet();assert.equal(totalFunds(w,expenses,'2026-10-12'),2650);
+ w.kite.divisions[0].amount=50000;w.card.amount=10000;
+ assert.equal(totalFunds(w,expenses,'2026-10-12'),2650);
+});
+test('incoming increases account funds, reduces card debt, and stays out of spending',()=>{
+ const incomes=[{amount:500,date:'2026-10-06',payment_source:'cash',transaction_type:'income'},{amount:1000,date:'2026-10-07',payment_source:'gpay',transaction_type:'income'},{amount:300,date:'2026-10-08',payment_source:'card',transaction_type:'income'}];
+ const records=[...expenses,...incomes];
+ assert.equal(walletBalance(wallet(),'cash',records,'2026-10-12'),1400);
+ assert.equal(walletBalance(wallet(),'gpay',records,'2026-10-12'),2750);
+ assert.equal(walletBalance(wallet(),'card',records,'2026-10-12'),400);
+ assert.equal(totalFunds(wallet(),records,'2026-10-12'),4150);
+ assert.equal(spendingSeries('2026-10',records,'2026-10-12').points.at(-1).amount,550);
+ assert.equal(walletBalance(wallet(),'cash',records.map(x=>x===incomes[0]?{...x,amount:200}:x),'2026-10-12'),1100);
+ assert.equal(walletBalance(wallet(),'cash',records.filter(x=>x!==incomes[0]),'2026-10-12'),900);
 });
 test('current and prior month cross year boundaries correctly',()=>{
  assert.deepEqual(monthPair(new Date(2027,0,1)),{current:'2027-01',previous:'2026-12'});
