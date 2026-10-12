@@ -20,5 +20,5 @@ test('incoming requires an account and a positive amount without Want/Need',()=>
  assert.doesNotThrow(()=>validateExpense(income));
  assert.throws(()=>validateExpense({...income,payment_source:''}));
  assert.throws(()=>validateExpense({...income,amount:-1}));
- assert.throws(()=>validateExpense({...income,transaction_type:'transfer'}));
+ assert.throws(()=>validateExpense({...income,transaction_type:'unsupported'}));
 });

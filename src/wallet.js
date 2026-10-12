@@ -1,31 +1,37 @@
-import {dateKey} from './budget.js';
+import {dateKey,money} from './budget.js';
 export const paymentSources={card:'Card',gpay:'GPay',cash:'Cash'};
-export function monthPair(date=new Date()){
- const current=dateKey(date).slice(0,7),previousDate=new Date(date.getFullYear(),date.getMonth()-1,1);
- return {current,previous:dateKey(previousDate).slice(0,7)};
-}
+export const accounts={cash:'Cash',gpay:'GPay',kite:'Kite',card:'Card'};
+export const isExpense=x=>!x.transaction_type||x.transaction_type==='expense';
+const cents=n=>Math.round(Number(n||0)*100);
+export function monthPair(date=new Date()){const previousDate=new Date(date.getFullYear(),date.getMonth()-1,1);return {current:dateKey(date).slice(0,7),previous:dateKey(previousDate).slice(0,7)};}
 export const monthName=key=>new Date(key+'-01T12:00:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
-export function defaultWallet(){const today=dateKey(),{current,previous}=monthPair();return {cash:{amount:0,as_of:today},gpay:{amount:0,as_of:today},card:{amount:0,as_of:today},kite:{divisions:[],credit_card:{[current]:0,[previous]:0}}};}
-export function walletBalance(wallet,source,expenses,today=dateKey()){
- const account=wallet[source],spent=expenses.filter(x=>x.payment_source===source&&x.date>=account.as_of&&x.date<=today).reduce((n,x)=>n+Math.round(Number(x.amount)*100)*(x.transaction_type==='income'?-1:1),0)/100;
- return Math.round((Number(account.amount)+(source==='card'?spent:-spent))*100)/100;
+export function defaultWallet(){const today=dateKey(),{current,previous}=monthPair();return {version:2,cash:{amount:0,as_of:today,divisions:[]},gpay:{amount:0,as_of:today,divisions:[]},card:{amount:0,as_of:today},kite:{amount:0,as_of:today,divisions:[],credit_card:{[current]:0,[previous]:0}}};}
+export function normalizeWallet(raw){const defaults=defaultWallet(),w=structuredClone(raw||defaults);for(const a of ['cash','gpay','card','kite'])w[a]={...defaults[a],...w[a]};w.kite.credit_card={...defaults.kite.credit_card,...w.kite.credit_card};w.version=2;return w;}
+export function divisionOptions(wallet,account,includeArchived=false){if(account==='card')return [];const w=normalizeWallet(wallet),list=w[account].divisions.filter(d=>includeArchived||!d.archived).map(d=>({id:d.id,name:d.name}));if(account==='kite'){const {current,previous}=monthPair();for(const month of [...new Set([current,previous,...Object.keys(w.kite.credit_card)])].sort().reverse())list.unshift({id:'credit:'+month,name:'Credit Card / '+monthName(month)});}return list;}
+export function endpointLabel(wallet,account,division){const name=accounts[account]||'Unspecified';if(account==='card')return name;const d=divisionOptions(wallet,account,true).find(d=>d.id===division);return name+' / '+(d?.name||'Unallocated');}
+export function postings(item){const amount=cents(item.amount);if(item.transaction_type==='transfer')return [{account:item.from_account,division:item.from_division||null,delta:-amount},{account:item.to_account,division:item.to_division||null,delta:amount}];return [{account:item.payment_source,division:item.division_id||null,delta:item.transaction_type==='income'?amount:-amount}];}
+function movement(wallet,account,records,today,division,filterDivision){return records.filter(x=>x.date>=wallet[account].as_of&&x.date<=today).flatMap(postings).filter(p=>p.account===account&&(!filterDivision||p.division===(division||null))).reduce((n,p)=>n+p.delta,0);}
+export function walletBalance(raw,account,records,today=dateKey()){const w=normalizeWallet(raw);let base=cents(w[account].amount);if(account==='kite'){base+=Object.values(w.kite.credit_card).reduce((n,x)=>n+cents(x),0)+w.kite.divisions.reduce((n,d)=>n+cents(d.amount),0);}const delta=movement(w,account,records,today,null,false);return (base+(account==='card'?-delta:delta))/100;}
+export function divisionBalance(raw,account,division,records,today=dateKey()){if(account==='card')return walletBalance(raw,account,records,today);const w=normalizeWallet(raw);if(!division)return Math.round((walletBalance(w,account,records,today)-divisionOptions(w,account,true).reduce((n,d)=>n+divisionBalance(w,account,d.id,records,today),0))*100)/100;const base=account==='kite'&&division.startsWith('credit:')?w.kite.credit_card[division.slice(7)]||0:w[account].divisions.find(d=>d.id===division)?.amount||0;return (cents(base)+movement(w,account,records,today,division,true))/100;}
+export function kiteTotal(wallet,records=[],today=dateKey()){return walletBalance(wallet,'kite',records,today);}
+export function totalFunds(wallet,records,today=dateKey()){return Math.round((walletBalance(wallet,'cash',records,today)+walletBalance(wallet,'gpay',records,today))*100)/100;}
+export function cardAmount(n){return n>0?'−'+money(n):n<0?'+'+money(-n):money(0);}
+export function creditComparison(wallet,records,date=new Date()){const {current,previous}=monthPair(date),reserved=divisionBalance(wallet,'kite','credit:'+current,records,dateKey(date))+divisionBalance(wallet,'kite','credit:'+previous,records,dateKey(date)),actual=walletBalance(wallet,'card',records,dateKey(date));return {reserved,actual,difference:Math.round((reserved-actual)*100)/100};}
+function validateEndpoint(wallet,account,division,source=false,allowArchived=false){if(!Object.hasOwn(accounts,account)||(source&&account==='card'))throw Error('Choose a valid account. Card can only receive payments.');if(account==='card'&&division)throw Error('Card has no divisions.');if(division&&!divisionOptions(wallet,account,allowArchived).some(d=>d.id===division))throw Error('Choose an active division.');}
+export function validateTransfer(item,raw,records,allowArchived=false){const wallet=normalizeWallet(raw);if(!Number.isFinite(Number(item.amount))||Number(item.amount)<=0||Number(item.amount)>100000000)throw Error('Enter a valid transfer amount.');if(!/^\d{4}-\d{2}-\d{2}$/.test(item.date)||Number.isNaN(Date.parse(item.date)))throw Error('Choose a valid date.');const previous=records.find(x=>x.id===item.id);validateEndpoint(wallet,item.from_account,item.from_division,true,allowArchived||Boolean(previous&&previous.from_account===item.from_account&&previous.from_division===item.from_division));validateEndpoint(wallet,item.to_account,item.to_division,false,allowArchived||Boolean(previous&&previous.to_account===item.to_account&&previous.to_division===item.to_division));if(item.from_account===item.to_account&&(item.from_division||null)===(item.to_division||null))throw Error('Choose different source and destination balances.');if(item.date<wallet[item.from_account].as_of||item.date<wallet[item.to_account].as_of)throw Error('Transfer date must be on or after both opening dates.');const other=records.filter(x=>x.id!==item.id);if(cents(divisionBalance(wallet,item.from_account,item.from_division,other,item.date))<cents(item.amount))throw Error('Insufficient funds in the source balance.');if(item.to_account==='card'&&cents(walletBalance(wallet,'card',other,item.date))<cents(item.amount))throw Error('Payment cannot exceed the outstanding Card bill.');}
+export function validateRecord(item,wallet,records){if(item.transaction_type==='transfer'){validateTransfer(item,wallet,records);return;}const allowed=item.transaction_type==='income'?accounts:paymentSources;if(!Object.hasOwn(allowed,item.payment_source))throw Error('Choose a valid account.');validateEndpoint(wallet,item.payment_source,item.division_id,false,records.some(x=>x.id===item.id));}
+export function validateLedger(raw,records){
+ const w=normalizeWallet(raw),ordinary=records.filter(x=>x.transaction_type!=='transfer'),transfers=records.filter(x=>x.transaction_type==='transfer').sort((a,b)=>a.date.localeCompare(b.date)||(a.created_at||'').localeCompare(b.created_at||''));
+ const prior=[...ordinary];for(const item of transfers){validateTransfer(item,w,prior,true);prior.push(item);}
 }
-export function kiteTotal(wallet){return Object.values(wallet.kite.credit_card).reduce((n,x)=>n+Number(x),0)+wallet.kite.divisions.reduce((n,x)=>n+Number(x.amount),0);}
-export function totalFunds(wallet,expenses,today=dateKey()){
- return Math.round((walletBalance(wallet,'cash',expenses,today)+walletBalance(wallet,'gpay',expenses,today))*100)/100;
-}
-export function creditComparison(wallet,expenses,date=new Date()){
- const {current,previous}=monthPair(date),reserved=Number(wallet.kite.credit_card[current]||0)+Number(wallet.kite.credit_card[previous]||0),actual=walletBalance(wallet,'card',expenses,dateKey(date));
- return {reserved,actual,difference:Math.round((reserved-actual)*100)/100};
-}
-export function validateWallet(wallet){
- for(const source of ['cash','gpay','card']){const a=wallet[source];if(!Number.isFinite(Number(a.amount))||Number(a.amount)<0||Number(a.amount)>100000000)throw Error('Enter valid account amounts.');if(!/^\d{4}-\d{2}-\d{2}$/.test(a.as_of)||Number.isNaN(Date.parse(a.as_of)))throw Error('Choose a valid balance date.');}
- const divisions=wallet.kite.divisions,names=new Set();
- for(const d of divisions){if(!d.name.trim()||d.name.trim().toLowerCase()==='credit card'||names.has(d.name.trim().toLowerCase()))throw Error('Use a unique division name.');names.add(d.name.trim().toLowerCase());if(!Number.isFinite(Number(d.amount))||Number(d.amount)<0||Number(d.amount)>100000000)throw Error('Enter valid division amounts.');}
- for(const [month,n] of Object.entries(wallet.kite.credit_card))if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||!Number.isFinite(Number(n))||Number(n)<0||Number(n)>100000000)throw Error('Enter valid credit card reserve amounts.');
-}
-export function spendingSeries(month,expenses,today=dateKey()){
- const [y,m]=month.split('-').map(Number),monthEnd=new Date(y,m,0).getDate(),last=month===today.slice(0,7)?Number(today.slice(8)):month<today.slice(0,7)?monthEnd:0;
- const daily=new Map();for(const x of expenses)if(x.transaction_type!=='income'&&x.date.startsWith(month)&&x.date<=today)daily.set(x.date,(daily.get(x.date)||0)+Math.round(Number(x.amount)*100));
- let running=0;const points=[{day:0,amount:0,daily:0}];for(let day=1;day<=last;day++){const key=month+'-'+String(day).padStart(2,'0'),spent=daily.get(key)||0;running+=spent;points.push({day,amount:running/100,daily:spent/100});}return {points,days:monthEnd};
+export function validateWallet(raw){const w=normalizeWallet(raw);for(const a of Object.keys(accounts)){const x=w[a];if(!Number.isFinite(Number(x.amount))||Number(x.amount)<0||Number(x.amount)>100000000)throw Error('Enter valid account amounts.');if(!/^\d{4}-\d{2}-\d{2}$/.test(x.as_of)||Number.isNaN(Date.parse(x.as_of)))throw Error('Choose a valid opening date.');if(a==='card')continue;const names=new Set();for(const d of x.divisions){const name=d.name.trim().toLowerCase();if(!name||name==='unallocated'||(a==='kite'&&name==='credit card')||names.has(name))throw Error('Use unique division names.');names.add(name);if(!Number.isFinite(Number(d.amount))||Number(d.amount)<0||Number(d.amount)>100000000)throw Error('Enter valid division balances.');}if(a!=='kite'&&x.divisions.reduce((n,d)=>n+cents(d.amount),0)>cents(x.amount))throw Error('Opening divisions cannot exceed the account opening balance.');}for(const [m,n] of Object.entries(w.kite.credit_card))if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(m)||!Number.isFinite(Number(n))||Number(n)<0||Number(n)>100000000)throw Error('Enter valid Card reserve amounts.');}
+export function spendingSeries(month,records,today=dateKey()){const [y,m]=month.split('-').map(Number),days=new Date(y,m,0).getDate(),last=month===today.slice(0,7)?Number(today.slice(8)):month<today.slice(0,7)?days:0,daily=new Map();for(const x of records)if(isExpense(x)&&x.date.startsWith(month)&&x.date<=today)daily.set(x.date,(daily.get(x.date)||0)+cents(x.amount));let running=0;const points=[{day:0,amount:0,daily:0}];for(let day=1;day<=last;day++){const spent=daily.get(month+'-'+String(day).padStart(2,'0'))||0;running+=spent;points.push({day,amount:running/100,daily:spent/100});}return {points,days};}
+
+export function validateWalletChange(next,previous,records){
+ const before=normalizeWallet(previous),after=normalizeWallet(next);
+ for(const account of ['cash','gpay','kite'])for(const old of before[account].divisions){
+  const replacement=after[account].divisions.find(d=>d.id===old.id),uses=records.filter(x=>postings(x).some(p=>p.account===account&&p.division===old.id));
+  if(!replacement&&(uses.length||Math.abs(divisionBalance(before,account,old.id,records))>.005))throw Error('Referenced or funded divisions cannot be deleted. Empty and archive them instead.');
+  if(replacement?.archived&&!old.archived&&(Math.abs(divisionBalance(before,account,old.id,records))>.005||uses.some(x=>x.date>dateKey())))throw Error('Empty this division and remove future records before archiving it.');
+ }
 }

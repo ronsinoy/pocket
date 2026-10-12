@@ -38,13 +38,13 @@ DESIGN-meta.md remains the palette reference; typography and density follow the 
 
 Expenses require Card, GPay, or Cash in addition to Want/Need. Existing records have an unspecified payment source until edited. CSV exports include the source.
 
-The Wallet tab stores opening Cash and GPay balances and the opening outstanding Card bill, each with a starting date. Enter the balance before any recorded expenses on that date. Expenses on or after that date reduce Cash/GPay funds or increase the Card bill; editing and deleting an expense recomputes those amounts. Future-dated expenses do not change today's wallet balance. To reflect deposits, card repayments, or a balance correction, set a new opening balance and date. Total funds includes Cash and GPay only. Kite allocations and Card debt are displayed separately.
+The Wallet tab stores opening Cash and GPay balances and the opening outstanding Card bill, each with a starting date. Enter the balance before any recorded expenses on that date. Expenses on or after that date reduce Cash/GPay funds or increase the Card bill; editing and deleting an expense recomputes those amounts. Future-dated expenses do not change today's wallet balance. Record deposits as incoming and card repayments as internal transfers. Use opening-balance settings only for initial setup or balance corrections. Total funds includes Cash and GPay only. Kite allocations and Card debt are displayed separately.
 
-Kite funds are the sum of its allocations. Add named divisions through Manage. The default Credit Card division has a current-month and previous-month reserve; older saved months are retained and shown when the month changes. The two recent reserves are compared against the outstanding Card bill. A shortfall is red. This is a reserve comparison, not an automatic card payment.
+Kite funds include its Unallocated balance and all division balances. Add named divisions through Manage. The default Credit Card division has a current-month and previous-month reserve; older saved months are retained and shown when the month changes. The two recent reserves are compared against the outstanding Card bill. A shortfall is red. This is a reserve comparison, not an automatic card payment.
 
 The graph shows cumulative spending from the beginning of the selected month through today (or the end of a past month). Hover, tap, or use the day slider to inspect spending.
 
-For existing Supabase projects, re-run `supabase/schema.sql`: its final section adds `expenses.payment_source` and the `wallets` table. Account balances, Kite divisions, and monthly reserves are saved in `wallets.data` by user ID. Local mode saves them with expenses in the same browser record. No database migration has been executed remotely by this workspace.
+For existing Supabase projects, re-run `supabase/schema.sql` to add ledger endpoint fields, transfer constraints, and wallet normalization. Account balances, Kite divisions, and monthly reserves are saved in `wallets.data` by user ID. Local mode saves them with expenses in the same browser record. No database migration has been executed remotely by this workspace.
 
 Emotes gently float continuously. The animation is disabled when the device requests reduced motion.
 
@@ -60,6 +60,12 @@ Install troubleshooting: restart `npm run dev` after changing the Vite configura
 
 ## Incoming and tools
 
-Use Incoming to record money received into Cash or GPay, or a Card refund/payment. Incoming entries share the transaction ledger, support editing/deletion and exports, appear in monthly and weekly reports, and increase funds or reduce card debt from the account's starting date. Spending totals and graphs exclude incoming. Want/Need remains mandatory for expenses; incoming has no spending classification. Funds still exclude Kite.
+Incoming is available only in Records. It can target Cash, GPay, Kite, their divisions, or Card for a refund. No incoming totals are displayed, even in Records. Incoming records are excluded from the dashboard recent list and reports, but still update balances. Want/Need remains mandatory only for expenses. Exports from Records include all transaction types; exports from other pages contain expenses only.
+
+Cash and GPay support optional named divisions. Existing funds start in Unallocated. New divisions start at zero; fund them with Transfer. Kite retains its default Credit Card division with current- and previous-month reserves. Referenced divisions cannot be deleted; empty ones can be archived and restored. Archived names remain available on historical records.
+
+Internal transfers move funds between Cash, GPay, and Kite accounts/divisions, or pay Card. Card cannot be a transfer source. Transfers are a single ledger record and affect both balances together; they never count as expenses or incoming. Sources must have enough funds on the transfer date, the date must be on or after both opening dates, and Card payments cannot exceed outstanding debt. Editing/deleting a record is rejected if it would invalidate a later transfer. Total funds remains Cash + GPay: moving money to Kite reduces the displayed liquid total without changing combined money-account funds.
+
+Supabase wallet data is normalized once while retaining opening amounts and historical records. Kite gets a persistent opening date at migration; transfer and Kite movements use that cutoff. Apply the updated schema before using the new fields online. The schema has been checked against an in-memory PostgreSQL instance, including reruns with transfers already present; no remote migration has been executed.
 
 The Tools tab has a calculator (arithmetic, brackets, percentages) and a notepad. Notes save per username using Save note, to Supabase when configured or browser storage otherwise. Run the latest `supabase/schema.sql` to add `transaction_type`, update the expense classification constraint, and create `notepads`.
