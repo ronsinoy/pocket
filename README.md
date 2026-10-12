@@ -47,3 +47,11 @@ The graph shows cumulative spending from the beginning of the selected month thr
 For existing Supabase projects, re-run `supabase/schema.sql`: its final section adds `expenses.payment_source` and the `wallets` table. Account balances, Kite divisions, and monthly reserves are saved in `wallets.data` by user ID. Local mode saves them with expenses in the same browser record. No database migration has been executed remotely by this workspace.
 
 Emotes gently float continuously. The animation is disabled when the device requests reduced motion.
+
+## Home-screen installation
+
+`npm run build` creates the web app manifest, app icons, and a versioned service worker. Deploy `dist/` over HTTPS, or use `npm run preview` on localhost for development. The Install control offers the browser install prompt when available; on iPhone it shows Safari's Share → Add to Home Screen instructions. Installed apps launch standalone.
+
+The existing Pocket wallet logo is available on white and black backgrounds under `public/icons/`, with 180px Apple and 192/512px Android versions. The manifest and Apple touch icon use the white background. The SVG browser favicon adapts between white and black with the device theme. Icons keep the logo inside the maskable safe zone.
+
+The service worker precaches only the built app shell and static assets, not Supabase responses or user data. Local-mode records remain available in browser storage offline; Supabase operations require connectivity. New app versions activate after the old app's tabs/windows close. Serve `/sw.js` with revalidation (`Cache-Control: no-cache`) on the production host.

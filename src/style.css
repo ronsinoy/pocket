@@ -97,3 +97,13 @@
 @media(min-width:768px){.content,.topbar{padding-left:40px;padding-right:40px}}
 @media(min-width:1024px){.content,.topbar{padding-left:48px;padding-right:48px}}
 @media(min-width:1280px){.content,.topbar{padding-left:64px;padding-right:64px}}
+.install-trigger{display:flex;align-items:center;gap:6px;min-height:40px;padding:6px 10px;border-radius:100px;color:var(--accent);font-size:11px}
+.install-dialog{width:calc(100% - 32px);max-width:380px;border:1px solid var(--border);border-radius:20px;padding:24px;color:var(--ink);background:var(--surface)}
+.install-dialog::backdrop{background:#0008}
+.install-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.install-dialog h2{font-size:19px;font-weight:500}
+.install-logo{display:block;width:80px;height:80px;margin:20px auto 16px;border:1px solid var(--border);border-radius:20px}
+.install-dialog>p{font-size:12px;text-align:center;line-height:1.5;margin:12px 0}
+.install-dialog .install-help{color:var(--muted);text-align:left;margin-top:18px}
+@media(max-width:479px){.install-trigger>span{display:none}.topbar-right{gap:6px}.install-trigger{padding:6px}.storage-status{font-size:9px}}
+@media(display-mode:standalone){.content{padding-top:24px}.topbar{padding-top:env(safe-area-inset-top);height:calc(60px + env(safe-area-inset-top))}}
