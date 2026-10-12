@@ -1,0 +1,10 @@
+export const dateKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+export const money = n => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',minimumFractionDigits:0,maximumFractionDigits:2}).format(n);
+export const sum = items => items.reduce((n,x)=>n+Number(x.amount),0);
+export function weeksForMonth(month,items){
+ const [y,m]=month.split('-').map(Number),days=new Date(y,m,0).getDate(),weeks=[];
+ for(let start=1;start<=days;){const weekday=(new Date(y,m-1,start).getDay()+6)%7,end=Math.min(days,start+6-weekday),first=`${month}-${String(start).padStart(2,'0')}`,last=`${month}-${String(end).padStart(2,'0')}`;weeks.push({start:first,end:last,items:items.filter(x=>x.date>=first&&x.date<=last)});start=end+1;}
+ return weeks;
+}
+export function validateExpense(x){if(!x.title.trim())throw Error('Give this expense a name.');if(!Number.isFinite(Number(x.amount))||Number(x.amount)<=0||Number(x.amount)>100000000)throw Error('Enter a valid amount greater than zero.');if(!['want','need'].includes(x.kind))throw Error('Choose Want or Need.');if(!['card','gpay','cash'].includes(x.payment_source))throw Error('Choose Card, GPay, or Cash.');if(!/^\d{4}-\d{2}-\d{2}$/.test(x.date)||Number.isNaN(Date.parse(x.date)))throw Error('Choose a valid date.');}
+export function demoExpenses(){const month=dateKey().slice(0,7);return [['Weekly groceries',1850,'Groceries','need',2],['Coffee with friends',320,'Food & drinks','want',4],['Internet bill',899,'Bills','need',5],['A new read',499,'Shopping','want',7],['Metro top-up',500,'Transport','need',8],['Friday takeout',650,'Food & drinks','want',9],['Fresh fruit',280,'Groceries','need',10],['Spotify Premium',119,'Subscriptions','want',11]].map(([title,amount,category,kind,day],i)=>({id:`demo-${i}`,title,amount,category,kind,payment_source:['gpay','cash','card'][i%3],date:`${month}-${String(day).padStart(2,'0')}`}));}
