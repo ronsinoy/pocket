@@ -46,4 +46,4 @@ function App(){const [user,setUser]=useState(()=>{try{return JSON.parse(localSto
 }
 createRoot(document.getElementById('root')).render(<App/>);
 
-if(import.meta.env.PROD && 'serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(error=>console.warn('Pocket offline setup unavailable:',error));});}
+
